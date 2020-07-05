@@ -17,3 +17,12 @@ Depues con la libreria **"os"** se lee el archivo de entrada especificado en los
 Se hizo uso de una arquitectura "Working Pool" para realizar la concurrencia en el envío de la data a la REST API que se especifica.
 
 Esta arquitectura hace uso de *Gorrutines* la cual abre un número de workers de acuerdo a la cantidad de hilos especificados en el parámetro de entrada y va tomando el primer dato del array con la data que actua como una cola FIFO y realiza el envío a la API viía POST.
+
+## Referencias
+https://yourbasic.org/golang/implement-fifo-queue/
+
+https://gobyexample.com/worker-pools
+
+https://tutorialedge.net/golang/parsing-json-with-golang/
+
+https://www.soberkoder.com/consume-rest-api-go/
