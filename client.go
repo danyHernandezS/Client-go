@@ -12,7 +12,7 @@ import (
 	"strconv"
 )
 
-//Estructura de persona
+//Person definition
 type Person struct {
 	Nombre       string `json:"nombre,omitempty"`
 	Departamento string `json:"departamento,omitempty"`
@@ -23,6 +23,38 @@ type Person struct {
 
 //arreglo con el listado de personas
 var people []Person
+
+//These function will receive work on the jobs channel and send the corresponding results on results.
+func enviarData(id int, strURL string, jobs <-chan int, results chan int) {
+
+	for i := range jobs {
+		if len(people) > 0 {
+			fmt.Println("worker", id, "started  job", i)
+			//read the data in the first position
+			jsonReq, err := json.Marshal(people[0])
+
+			//make a slice to do a dequeue kind of operation
+			people = people[1:]
+
+			//send the data taked and POST it to the url API
+			resp, err := http.Post(strURL, "application/json; charset=utf-8", bytes.NewBuffer(jsonReq))
+			if err != nil {
+				log.Fatalln(err)
+				return
+			}
+
+			//close connection
+			defer resp.Body.Close()
+			bodyBytes, _ := ioutil.ReadAll(resp.Body)
+
+			// Convert response body to string
+			bodyString := string(bodyBytes)
+			fmt.Println(bodyString)
+			fmt.Println("worker", id, "finished  job", i)
+		}
+		results <- i * 2
+	}
+}
 
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
@@ -39,8 +71,6 @@ func main() {
 	scanner.Scan()
 	strArchivo := scanner.Text()
 
-	fmt.Printf("URL: %s HILOS: %d CANTIDAD: %d ARCHIVO: %s", strURL, intHilos, intCantidad, strArchivo)
-
 	// Open our jsonFile
 	jsonFile, err := os.Open(strArchivo)
 
@@ -48,8 +78,6 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-
-	fmt.Println("Archivo leido satisfactoriamente")
 
 	// defer the closing of our jsonFile so that we can parse it later on
 	defer jsonFile.Close()
@@ -61,23 +89,23 @@ func main() {
 	// jsonFile's content into 'users' which we defined above
 	json.Unmarshal(byteValue, &people)
 
-	for i := 0; i < len(people); i++ {
-		//fmt.Println("Nombre : " + people[i].Nombre)
-		//fmt.Println("Estado: " + people[i].Estado)
-		//fmt.Println("Edad: " + strconv.Itoa(people[i].Edad))
-		//fmt.Println("Departamento: " + people[i].Departamento)
-		//fmt.Println("TipoContagio: " + people[i].Contagio)
-		jsonReq, err := json.Marshal(people[i])
-		resp, err := http.Post(strURL, "application/json; charset=utf-8", bytes.NewBuffer(jsonReq))
-		if err != nil {
-			log.Fatalln(err)
-		}
+	// make a chanel to indicate the number of jobs to run
+	jobs := make(chan int, intCantidad)
+	// collect all the results of the work.
+	results := make(chan int, intCantidad)
 
-		defer resp.Body.Close()
-		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	// starts up "w" workers, initially blocked because there are no jobs yet.
+	for w := 1; w <= intHilos; w++ {
 
-		// Convert response body to string
-		bodyString := string(bodyBytes)
-		fmt.Println(bodyString)
+		go enviarData(w, strURL, jobs, results)
+	}
+	//send  jobs and then close that channel to indicate that’s all the work we have.
+	for j := 1; j <= intCantidad; j++ {
+		jobs <- j
+	}
+	close(jobs)
+	//collect all the results of the work. This also ensures that the worker goroutines have finished
+	for a := 1; a <= intCantidad; a++ {
+		<-results
 	}
 }
